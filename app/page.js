@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy } from "lucide-react";
 
 const THEMES = {
   light: {
@@ -70,6 +70,7 @@ export default function Home() {
   const [isDark, setIsDark] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
+  const [monthlyOpen, setMonthlyOpen] = useState(false);
 
   const t = isDark ? THEMES.dark : THEMES.light;
   const week = WEEKS[weekIdx];
@@ -130,17 +131,27 @@ export default function Home() {
               EINKAUFSRADAR
             </h1>
           </div>
-          <button
-            aria-label="Einstellungen"
-            onClick={() => { setSettingsOpen(true); setSettingsTab("general"); }}
-            className="p-2 rounded-full active:scale-95 transition-transform"
-            style={{ color: t.sub }}
-          >
-            <Settings size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              aria-label="Monatsbestenliste"
+              onClick={() => setMonthlyOpen(true)}
+              className="p-2 rounded-full active:scale-95 transition-transform"
+              style={{ color: t.sub }}
+            >
+              <Trophy size={20} />
+            </button>
+            <button
+              aria-label="Einstellungen"
+              onClick={() => { setSettingsOpen(true); setSettingsTab("general"); }}
+              className="p-2 rounded-full active:scale-95 transition-transform"
+              style={{ color: t.sub }}
+            >
+              <Settings size={20} />
+            </button>
+          </div>
         </div>
-        <p className="text-sm mb-6" style={{ color: t.sub }}>
-          Die Antwort, wo diese Woche am günstigsten eingekauft wird.
+        <p className="text-sm mb-6 text-center" style={{ color: t.sub }}>
+          Der wöchentliche Lebensmittel-Preisvergleich für dein Bundesland.
         </p>
 
         {/* Week nav — ticker style */}
@@ -235,30 +246,35 @@ export default function Home() {
                 {ranking.map((entry, i) => {
                   const rank = i + 1;
                   const isTop = rank === 1;
+                  const isPodium = rank <= 3;
+                  const medalColor =
+                    rank === 1 ? "#D4AF37" : rank === 2 ? "#A8A8A8" : rank === 3 ? "#B5651D" : null;
                   return (
                     <div
                       key={entry.name}
-                      className="flex items-center justify-between py-1.5"
+                      className={`flex items-center justify-between px-3 rounded-lg ${isPodium ? "py-2.5" : "py-1.5"}`}
                       style={{
-                        borderBottom: i < ranking.length - 1 ? `1px dotted ${t.border}` : "none",
+                        background: isPodium ? `${medalColor}1A` : "transparent",
+                        border: isPodium ? `1px solid ${medalColor}55` : "none",
+                        borderBottom: !isPodium && i < ranking.length - 1 ? `1px dotted ${t.border}` : undefined,
                       }}
                     >
                       <div className="flex items-center gap-3">
                         <span
-                          className="mono-font text-xs font-semibold w-5 text-center rounded"
+                          className="mono-font text-xs font-bold w-6 h-6 flex items-center justify-center rounded"
                           style={{
-                            color: isTop ? "#fff" : t.ink,
-                            background: isTop ? t.amber : "transparent",
+                            color: isPodium ? "#fff" : t.ink,
+                            background: isPodium ? medalColor : "transparent",
                           }}
                         >
                           {rank}
                         </span>
-                        <span className={`text-sm ${isTop ? "font-bold" : "font-medium"}`}>
+                        <span className={`text-sm ${isPodium ? "font-bold" : "font-medium"}`} style={{ fontSize: isPodium ? "0.95rem" : undefined }}>
                           {entry.name}
                         </span>
                       </div>
                       <span className="mono-font text-sm font-semibold" style={{ color: isTop ? t.green : t.ink }}>
-                        {isTop ? "Bester Preis" : entry.diffPercent === 0 ? "Gleich günstig" : `+${entry.diffPercent}% Teurer`}
+                        {isTop ? "Bester Preis" : `+${Math.max(1, entry.diffPercent)}% Teurer`}
                       </span>
                     </div>
                   );
@@ -394,8 +410,9 @@ export default function Home() {
               <div className="space-y-3">
                 <p className="text-sm font-medium">So entsteht die Rangliste</p>
                 <p className="text-xs" style={{ color: t.sub }}>
-                  Der günstigste Händler der Woche gilt als Bester Preis. Alle anderen Plätze zeigen,
-                  wie viel teurer sie im Vergleich zu diesem günstigsten Anbieter sind.
+                  Der jeweils günstigste Anbieter der Woche wird als Bester Preis ausgewiesen.
+                  Alle weiteren Plätze zeigen, um wie viel Prozent sie im Vergleich dazu teurer
+                  ausfallen.
                 </p>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
                   <p className="text-[11px]" style={{ color: t.sub }}>
@@ -419,8 +436,9 @@ export default function Home() {
                   <p className="text-sm font-medium">Über Einkaufsradar</p>
                 </div>
                 <p className="text-xs" style={{ color: t.sub }}>
-                  Einkaufsradar zeigt jede Woche, wo Lebensmittel-Einkauf in deinem Bundesland am
-                  günstigsten ist — ohne Prospekte zu wälzen.
+                  Einkaufsradar ermittelt jede Woche, in welchem Bundesland der
+                  Lebensmitteleinkauf am günstigsten ausfällt. Verlässlich recherchiert,
+                  ganz ohne mühsames Blättern durch Prospekte.
                 </p>
                 <div className="text-xs space-y-1" style={{ color: t.sub }}>
                   <div className="flex justify-between"><span>Version</span><span className="mono-font">0.2 · Prototyp</span></div>
@@ -429,6 +447,49 @@ export default function Home() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Monthly podium overlay */}
+      {monthlyOpen && (
+        <div
+          className="fixed inset-0 flex items-end sm:items-center justify-center z-50"
+          style={{ background: "#00000066" }}
+          onClick={() => setMonthlyOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-t-2xl sm:rounded-2xl px-5 pt-5 pb-8 sm:pb-6"
+            style={{ background: t.cardBg, color: t.ink }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="display-font text-base">MONATSBESTENLISTE</h2>
+              <button aria-label="Schließen" onClick={() => setMonthlyOpen(false)} style={{ color: t.sub }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex items-end justify-center gap-3 mb-5 opacity-50">
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: "#A8A8A8" }}>2</div>
+                <div className="w-16 h-14 rounded-t-md" style={{ background: t.border }} />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "#D4AF37" }}>1</div>
+                <div className="w-16 h-20 rounded-t-md" style={{ background: t.border }} />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: "#B5651D" }}>3</div>
+                <div className="w-16 h-10 rounded-t-md" style={{ background: t.border }} />
+              </div>
+            </div>
+
+            <p className="text-sm text-center font-medium mb-1">Bald verfügbar</p>
+            <p className="text-xs text-center" style={{ color: t.sub }}>
+              Sobald ausreichend Wochendaten vorliegen, zeigen wir dir hier, welcher
+              Händler im vergangenen Monat am häufigsten die günstigsten Preise bot.
+            </p>
           </div>
         </div>
       )}
