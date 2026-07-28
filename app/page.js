@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2 } from "lucide-react";
 
 const THEMES = {
   light: {
@@ -71,6 +71,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
   const [monthlyOpen, setMonthlyOpen] = useState(false);
+  const [shareMsg, setShareMsg] = useState("");
 
   const t = isDark ? THEMES.dark : THEMES.light;
   const week = WEEKS[weekIdx];
@@ -79,6 +80,49 @@ export default function Home() {
     if (!selectedState) return [];
     return seededScores(hashOf(selectedState + week.label));
   }, [selectedState, week.label]);
+
+  // Beim ersten Laden: zuletzt gewähltes Bundesland wiederherstellen
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("einkaufsradar_last_state");
+      if (saved) setSelectedState(saved);
+    } catch (e) {
+      // localStorage nicht verfügbar – einfach ignorieren
+    }
+  }, []);
+
+  // Bei jeder Auswahl: neues Bundesland merken
+  const chooseState = (state) => {
+    setSelectedState(state);
+    try {
+      window.localStorage.setItem("einkaufsradar_last_state", state);
+    } catch (e) {
+      // ignorieren, falls nicht verfügbar
+    }
+  };
+
+  const handleShare = async () => {
+    const topEntry = ranking[0];
+    const text = topEntry
+      ? `${topEntry.name} ist diese Woche in ${selectedState} am günstigsten – einkaufsradar.com`
+      : "einkaufsradar.com";
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, url: "https://einkaufsradar.com" });
+        return;
+      }
+    } catch (e) {
+      // Nutzer hat Teilen abgebrochen oder nicht verfügbar – Fallback unten
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} https://einkaufsradar.com`);
+      setShareMsg("Link kopiert!");
+      setTimeout(() => setShareMsg(""), 2000);
+    } catch (e) {
+      setShareMsg("Teilen nicht möglich");
+      setTimeout(() => setShareMsg(""), 2000);
+    }
+  };
 
   return (
     <div
@@ -205,7 +249,7 @@ export default function Home() {
               {STATES.map((state) => (
                 <button
                   key={state}
-                  onClick={() => setSelectedState(state)}
+                  onClick={() => chooseState(state)}
                   className="text-left rounded-xl px-4 py-4 transition-transform active:scale-95"
                   style={{
                     background: t.cardBg,
@@ -220,13 +264,22 @@ export default function Home() {
           </>
         ) : (
           <>
-            <button
-              onClick={() => setSelectedState(null)}
-              className="flex items-center gap-1 text-sm font-medium mb-4"
-              style={{ color: t.green }}
-            >
-              <ArrowLeft size={16} /> Zurück
-            </button>
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setSelectedState(null)}
+                className="flex items-center gap-1 text-sm font-medium"
+                style={{ color: t.green }}
+              >
+                <ArrowLeft size={16} /> Zurück
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-1 text-sm font-medium"
+                style={{ color: t.green }}
+              >
+                <Share2 size={16} /> {shareMsg || "Teilen"}
+              </button>
+            </div>
 
             {/* Receipt card */}
             <div className="torn-top" />
