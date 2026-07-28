@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail } from "lucide-react";
 
 const THEMES = {
   light: {
@@ -25,26 +25,30 @@ const THEMES = {
 };
 
 const STATES = [
-  "Berlin", "NRW", "Sachsen", "Bremen", "Bayern", "Hessen",
+  "Berlin", "Nordrhein-Westfalen", "Sachsen", "Bremen", "Bayern", "Hessen",
   "Niedersachsen", "Hamburg", "Baden-Württemberg", "Sachsen-Anhalt",
   "Thüringen", "Rheinland-Pfalz", "Schleswig-Holstein", "Brandenburg",
   "Saarland", "Mecklenburg-Vorpommern",
-];
+].sort((a, b) => a.localeCompare(b, "de"));
 
 const CHAINS = ["Aldi Süd", "Lidl", "Netto", "Rewe", "Edeka", "Kaufland", "Penny", "Aldi Nord", "Real", "Norma"];
 
-// TEMPORÄRE Demo-Daten. Sobald Supabase angebunden ist, wird diese Funktion
-// durch einen echten Datenbank-Abruf ersetzt (dazu kommen wir in Phase 2).
+// Berechnet Test-Preise, dann Prozent-Differenz zum Guenstigsten (Platz 1 = "Bester Preis")
 function seededScores(seed) {
   let s = seed;
   const rand = () => {
     s = (s * 9301 + 49297) % 233280;
     return s / 233280;
   };
-  return CHAINS
-    .map((name) => ({ name, score: Math.round(55 + rand() * 44) }))
-    .sort((a, b) => b.score - a.score)
+  const raw = CHAINS
+    .map((name) => ({ name, price: Math.round((30 + rand() * 20) * 100) / 100 }))
+    .sort((a, b) => a.price - b.price)
     .slice(0, 10);
+  const best = raw[0].price;
+  return raw.map((entry) => ({
+    name: entry.name,
+    diffPercent: Math.round(((entry.price - best) / best) * 100),
+  }));
 }
 
 function hashOf(str) {
@@ -254,7 +258,7 @@ export default function Home() {
                         </span>
                       </div>
                       <span className="mono-font text-sm font-semibold" style={{ color: isTop ? t.green : t.ink }}>
-                        {entry.score}
+                        {isTop ? "Bester Preis" : entry.diffPercent === 0 ? "Gleich günstig" : `+${entry.diffPercent}% Teurer`}
                       </span>
                     </div>
                   );
@@ -267,7 +271,7 @@ export default function Home() {
                   className="text-[11px] leading-snug underline decoration-dotted text-left"
                   style={{ color: t.sub }}
                 >
-                  Score = 65% Grundpreis-Niveau (Alltagsprodukte) + 35% Angebotstiefe. Wie wird
+                  Alle Werte beziehen sich auf den günstigsten Anbieter dieser Woche. Wie wird
                   bewertet?
                 </button>
               </div>
@@ -275,7 +279,7 @@ export default function Home() {
             <div className="torn-bottom" />
 
             <p className="text-center text-xs mt-4" style={{ color: t.sub }}>
-              Aktualisiert · Montag 07:00 Uhr
+              Aktualisiert · Montag 08:00 Uhr
             </p>
           </>
         )}
@@ -351,44 +355,58 @@ export default function Home() {
                     <Bell size={16} />
                     <span className="text-sm font-medium">Push-Benachrichtigung</span>
                   </div>
-                  <button
-                    onClick={() => setNotify((n) => !n)}
-                    className="w-10 h-6 rounded-full relative transition-colors"
-                    style={{ background: notify ? t.green : t.border }}
+                  <span
+                    className="text-xs font-medium px-2 py-1 rounded-full"
+                    style={{
+                      background: notify ? t.green : "transparent",
+                      color: notify ? "#fff" : t.sub,
+                      border: `1px solid ${notify ? t.green : t.border}`,
+                    }}
                   >
-                    <span
-                      className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
-                      style={{ left: notify ? "18px" : "2px" }}
-                    />
-                  </button>
+                    {notify ? "Aktiv" : "Inaktiv"}
+                  </span>
                 </div>
                 <p className="text-[11px]" style={{ color: t.sub }}>
-                  Bei aktivierter Benachrichtigung meldet sich Einkaufsradar jeden Montag um 7 Uhr mit
-                  dem neuen Ranking für dein gewähltes Bundesland.
+                  Bei aktivierter Benachrichtigung meldet sich Einkaufsradar jeden Montag um 8 Uhr mit
+                  dem neuen Ranking für dein gewähltes Bundesland. Ein-/ausschalten geht über den
+                  Button auf der Startseite.
                 </p>
+
+                <div className="border-t border-dashed pt-4 mt-1" style={{ borderColor: t.border }}>
+                  <div
+                    className="flex items-center justify-between rounded-xl px-3 py-2.5 opacity-60"
+                    style={{ background: t.pageBg }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Mail size={16} style={{ color: t.sub }} />
+                      <span className="text-sm font-medium">Feedback senden</span>
+                    </div>
+                    <span className="text-xs" style={{ color: t.sub }}>bald verfügbar</span>
+                  </div>
+                  <p className="text-[11px] mt-2" style={{ color: t.sub }}>
+                    Öffnet dein Mail-Programm mit einer vorausgefüllten Nachricht an uns.
+                  </p>
+                </div>
               </div>
             )}
 
             {settingsTab === "scoring" && (
               <div className="space-y-3">
-                <p className="text-sm font-medium">So entsteht der Score</p>
-                <div className="flex items-center gap-3">
-                  <div className="mono-font text-lg font-bold" style={{ color: t.green }}>65%</div>
-                  <p className="text-xs" style={{ color: t.sub }}>
-                    Grundpreis-Niveau: Preise eines festen Warenkorbs aus ca. 25 Alltagsprodukten
-                    (Milch, Brot, Eier, Nudeln u.a.), erhoben je Händler und Region.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="mono-font text-lg font-bold" style={{ color: t.amber }}>35%</div>
-                  <p className="text-xs" style={{ color: t.sub }}>
-                    Angebotstiefe: wie stark und wie breit ein Händler diese Woche rabattiert.
+                <p className="text-sm font-medium">So entsteht die Rangliste</p>
+                <p className="text-xs" style={{ color: t.sub }}>
+                  Der günstigste Händler der Woche gilt als Bester Preis. Alle anderen Plätze zeigen,
+                  wie viel teurer sie im Vergleich zu diesem günstigsten Anbieter sind.
+                </p>
+                <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-[11px]" style={{ color: t.sub }}>
+                    Die Rangfolge basiert auf einem festen Warenkorb aus Alltagsprodukten (Milch,
+                    Brot, Eier, Nudeln u.a.) sowie den aktuellen Wochenangeboten je Händler.
                   </p>
                 </div>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
                   <p className="text-[11px]" style={{ color: t.sub }}>
-                    Niedrigster Gesamtpreis-Score = Platz 1. Die Gewichtung ist ein Modell, kein
-                    amtlicher Wert, und wird laufend anhand von Nutzer-Feedback justiert.
+                    Die angezeigten Werte sind Durchschnittswerte auf Bundeslandebene. Tatsächliche
+                    Preise können je nach Filiale, Stadt oder Kommune leicht abweichen.
                   </p>
                 </div>
               </div>
@@ -405,9 +423,9 @@ export default function Home() {
                   günstigsten ist — ohne Prospekte zu wälzen.
                 </p>
                 <div className="text-xs space-y-1" style={{ color: t.sub }}>
-                  <div className="flex justify-between"><span>Version</span><span className="mono-font">0.1 · Prototyp</span></div>
+                  <div className="flex justify-between"><span>Version</span><span className="mono-font">0.2 · Prototyp</span></div>
                   <div className="flex justify-between"><span>Datenstand</span><span className="mono-font">{week.label}</span></div>
-                  <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">Mo. 07:00</span></div>
+                  <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">Mo. 08:00</span></div>
                 </div>
               </div>
             )}
