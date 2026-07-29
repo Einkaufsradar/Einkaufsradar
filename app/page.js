@@ -72,6 +72,7 @@ export default function Home() {
   const [settingsTab, setSettingsTab] = useState("general");
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [shareMsg, setShareMsg] = useState("");
+  const [ready, setReady] = useState(false);
 
   const t = isDark ? THEMES.dark : THEMES.light;
   const week = WEEKS[weekIdx];
@@ -81,7 +82,8 @@ export default function Home() {
     return seededScores(hashOf(selectedState + week.label));
   }, [selectedState, week.label]);
 
-  // Beim ersten Laden: zuletzt gewähltes Bundesland wiederherstellen
+  // Beim ersten Laden: zuletzt gewähltes Bundesland wiederherstellen,
+  // bevor irgendetwas angezeigt wird (verhindert kurzes Aufblitzen der Auswahlliste)
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("einkaufsradar_last_state");
@@ -89,6 +91,7 @@ export default function Home() {
     } catch (e) {
       // localStorage nicht verfügbar – einfach ignorieren
     }
+    setReady(true);
   }, []);
 
   // Bei jeder Auswahl: neues Bundesland merken
@@ -106,14 +109,18 @@ export default function Home() {
     const text = topEntry
       ? `${topEntry.name} ist diese Woche in ${selectedState} am günstigsten – einkaufsradar.com`
       : "einkaufsradar.com";
-    try {
-      if (navigator.share) {
+
+    // Natives Teilen-Menü, falls verfügbar (z. B. am Handy)
+    if (navigator.share) {
+      try {
         await navigator.share({ text, url: "https://einkaufsradar.com" });
-        return;
+      } catch (e) {
+        // Nutzer hat den Teilen-Dialog abgebrochen – bewusst nichts weiter tun
       }
-    } catch (e) {
-      // Nutzer hat Teilen abgebrochen oder nicht verfügbar – Fallback unten
+      return;
     }
+
+    // Fallback nur, wenn kein natives Teilen-Menü existiert (z. B. am Desktop)
     try {
       await navigator.clipboard.writeText(`${text} https://einkaufsradar.com`);
       setShareMsg("Link kopiert!");
@@ -123,6 +130,8 @@ export default function Home() {
       setTimeout(() => setShareMsg(""), 2000);
     }
   };
+
+  if (!ready) return null;
 
   return (
     <div
