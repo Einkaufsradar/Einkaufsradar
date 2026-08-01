@@ -31,23 +31,40 @@ const STATES = [
   "Saarland", "Mecklenburg-Vorpommern",
 ].sort((a, b) => a.localeCompare(b, "de"));
 
-const CHAINS = ["Aldi Süd", "Lidl", "Netto", "Rewe", "Edeka", "Kaufland", "Penny", "Aldi Nord", "Real", "Norma"];
+// Recherchierte, bundeslandspezifische Top-10-Ketten (siehe Einkaufsradar-Ketten-Liste.md)
+const STATE_CHAINS = {
+  "Baden-Württemberg": ["Aldi Süd", "Lidl", "Edeka", "Rewe", "Kaufland", "Penny", "Netto", "Norma", "Hieber", "Globus"],
+  "Bayern": ["Aldi Süd", "Lidl", "Edeka", "Rewe", "Kaufland", "Penny", "Netto", "Norma", "V-Markt", "Globus"],
+  "Berlin": ["Aldi Nord", "Lidl", "Rewe", "Edeka", "Kaufland", "Penny", "Netto", "Netto Nord", "Norma", "Bio Company"],
+  "Brandenburg": ["Aldi Nord", "Lidl", "Rewe", "Edeka", "Kaufland", "Penny", "Netto", "Netto Nord", "Norma", "Bio Company"],
+  "Bremen": ["Aldi Nord", "Lidl", "Rewe", "Edeka", "Kaufland", "Penny", "Netto", "Combi", "famila", "Marktkauf"],
+  "Hamburg": ["Aldi Nord", "Edeka", "Rewe", "Lidl", "Kaufland", "Penny", "Netto", "Netto Nord", "famila", "Globus"],
+  "Hessen": ["Edeka", "Rewe", "Aldi Süd", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "tegut", "Norma"],
+  "Mecklenburg-Vorpommern": ["Aldi Nord", "Lidl", "Edeka", "Rewe", "Kaufland", "Penny", "Netto", "Netto Nord", "Norma", "famila"],
+  "Niedersachsen": ["Edeka", "Rewe", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "Combi", "famila", "K+K"],
+  "Nordrhein-Westfalen": ["Edeka", "Rewe", "Aldi Süd", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "K+K", "HIT"],
+  "Rheinland-Pfalz": ["Aldi Süd", "Lidl", "Edeka", "Rewe", "Kaufland", "Penny", "Netto", "Norma", "Wasgau", "Globus"],
+  "Saarland": ["Aldi Süd", "Lidl", "Edeka", "Rewe", "Kaufland", "Penny", "Netto", "Globus", "Norma", "Wasgau"],
+  "Sachsen": ["Edeka", "Rewe", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "Netto Nord", "Konsum", "Norma"],
+  "Sachsen-Anhalt": ["Edeka", "Rewe", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "Netto Nord", "Norma", "NP"],
+  "Schleswig-Holstein": ["Aldi Nord", "Lidl", "Edeka", "Rewe", "Kaufland", "Penny", "Netto", "Netto Nord", "famila", "Markant"],
+  "Thüringen": ["Edeka", "Rewe", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "tegut", "Norma", "Aldi Süd"],
+};
 
-// Berechnet Test-Preise, dann Prozent-Differenz zum Guenstigsten (Platz 1 = "Bester Preis")
-function seededScores(seed) {
+// Berechnet Prozent-Differenz zum Guenstigsten (Platz 1 = "Bester Preis").
+// Maximale Differenz ist bewusst auf 30% begrenzt, damit die Werte realistisch wirken.
+function seededScores(seed, chains) {
   let s = seed;
   const rand = () => {
     s = (s * 9301 + 49297) % 233280;
     return s / 233280;
   };
-  const raw = CHAINS
-    .map((name) => ({ name, price: Math.round((30 + rand() * 20) * 100) / 100 }))
-    .sort((a, b) => a.price - b.price)
-    .slice(0, 10);
-  const best = raw[0].price;
+  const raw = chains.map((name) => ({ name, raw: rand() * 30 }));
+  raw.sort((a, b) => a.raw - b.raw);
+  const minRaw = raw[0].raw;
   return raw.map((entry) => ({
     name: entry.name,
-    diffPercent: Math.round(((entry.price - best) / best) * 100),
+    diffPercent: Math.round(entry.raw - minRaw),
   }));
 }
 
@@ -61,10 +78,15 @@ const WEEKS = [
   { label: "KW 26", range: "22.06 – 28.06" },
   { label: "KW 27", range: "29.06 – 05.07" },
   { label: "KW 28", range: "06.07 – 12.07" },
+  { label: "KW 29", range: "13.07 – 19.07" },
+  { label: "KW 30", range: "20.07 – 26.07" },
+  { label: "KW 31", range: "27.07 – 02.08" },
+  { label: "KW 32", range: "03.08 – 09.08" },
+  { label: "KW 33", range: "10.08 – 16.08" },
 ];
 
 export default function Home() {
-  const [weekIdx, setWeekIdx] = useState(1);
+  const [weekIdx, setWeekIdx] = useState(WEEKS.length - 1);
   const [selectedState, setSelectedState] = useState(null);
   const [notify, setNotify] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -78,7 +100,8 @@ export default function Home() {
 
   const ranking = useMemo(() => {
     if (!selectedState) return [];
-    return seededScores(hashOf(selectedState + week.label));
+    const chains = STATE_CHAINS[selectedState] || [];
+    return seededScores(hashOf(selectedState + week.label), chains);
   }, [selectedState, week.label]);
 
   // Beim ersten Laden: zuletzt gewähltes Bundesland wiederherstellen
@@ -498,7 +521,7 @@ export default function Home() {
                   ganz ohne mühsames Blättern durch Prospekte.
                 </p>
                 <div className="text-xs space-y-1" style={{ color: t.sub }}>
-                  <div className="flex justify-between"><span>Version</span><span className="mono-font">0.2 · Prototyp</span></div>
+                  <div className="flex justify-between"><span>Version</span><span className="mono-font">0.3 · Prototyp</span></div>
                   <div className="flex justify-between"><span>Datenstand</span><span className="mono-font">{week.label}</span></div>
                   <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">Mo. 08:00</span></div>
                 </div>
