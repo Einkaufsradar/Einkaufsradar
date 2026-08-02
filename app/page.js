@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Minus, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2, Truck } from "lucide-react";
 
 const THEMES = {
   light: {
@@ -51,9 +51,15 @@ const STATE_CHAINS = {
   "Thüringen": ["Edeka", "Rewe", "Aldi Nord", "Lidl", "Kaufland", "Penny", "Netto", "tegut", "Norma", "Aldi Süd"],
 };
 
+// Bundesweiter, 17. Auswahl-Punkt: Online-Lieferdienste (kein Bundesland-Bezug).
+// Bewusst getrennt von STATE_CHAINS, weil hier andere Anbieter/Logik gelten (siehe Briefing).
+const ONLINE_DELIVERY = "Online-Lieferdienst";
+const ONLINE_CHAINS = ["Rewe", "myTime", "Edeka24", "Flaschenpost", "Knuspr", "Picnic", "Flink"];
+
 // Berechnet Prozent-Differenz zum Guenstigsten (Platz 1 = "Bester Preis").
 // Maximale Differenz ist bewusst auf 30% begrenzt, damit die Werte realistisch wirken.
 function seededScores(seed, chains) {
+  if (!chains || chains.length === 0) return [];
   let s = seed;
   const rand = () => {
     s = (s * 9301 + 49297) % 233280;
@@ -97,18 +103,47 @@ export default function Home() {
 
   const t = isDark ? THEMES.dark : THEMES.light;
   const week = WEEKS[weekIdx];
+  const isOnlineDelivery = selectedState === ONLINE_DELIVERY;
 
   const ranking = useMemo(() => {
     if (!selectedState) return [];
-    const chains = STATE_CHAINS[selectedState] || [];
-    return seededScores(hashOf(selectedState + week.label), chains);
-  }, [selectedState, week.label]);
+    const chains = isOnlineDelivery ? ONLINE_CHAINS : (STATE_CHAINS[selectedState] || []);
+    const currentWeek = WEEKS[weekIdx];
+    const current = seededScores(hashOf(selectedState + currentWeek.label), chains);
 
-  // Beim ersten Laden: zuletzt gewähltes Bundesland wiederherstellen
+    // Trend bezieht sich bewusst ausschließlich auf die direkte Vorwoche, nie kumulativ.
+    if (weekIdx === 0) {
+      return current.map((entry) => ({ ...entry, trend: null }));
+    }
+    const prevWeek = WEEKS[weekIdx - 1];
+    const previous = seededScores(hashOf(selectedState + prevWeek.label), chains);
+    const prevRankByName = {};
+    previous.forEach((entry, i) => { prevRankByName[entry.name] = i + 1; });
+
+    return current.map((entry, i) => {
+      const currentRank = i + 1;
+      const prevRank = prevRankByName[entry.name];
+      let trend = null;
+      if (prevRank !== undefined) {
+        trend = currentRank < prevRank ? "up" : currentRank > prevRank ? "down" : "same";
+      }
+      return { ...entry, trend };
+    });
+  }, [selectedState, isOnlineDelivery, weekIdx]);
+
+  // Beim ersten Laden: zuletzt gewähltes Bundesland, Darstellung und Push-Status wiederherstellen
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem("einkaufsradar_last_state");
-      if (saved) setSelectedState(saved);
+      const savedState = window.localStorage.getItem("einkaufsradar_last_state");
+      // Nur wiederherstellen, wenn der gespeicherte Wert noch ein gültiges Bundesland
+      // oder der Online-Lieferdienst ist – sonst könnte ein veralteter/ungültiger Wert
+      // (z. B. nach einer Umbenennung) beim Laden zum Absturz führen.
+      const isValidSaved = savedState && (STATE_CHAINS[savedState] || savedState === ONLINE_DELIVERY);
+      if (isValidSaved) setSelectedState(savedState);
+      const savedDark = window.localStorage.getItem("einkaufsradar_dark_mode");
+      if (savedDark) setIsDark(savedDark === "dark");
+      const savedNotify = window.localStorage.getItem("einkaufsradar_notify");
+      if (savedNotify) setNotify(savedNotify === "true");
     } catch (e) {
       // localStorage nicht verfügbar – einfach ignorieren
     }
@@ -124,11 +159,37 @@ export default function Home() {
     }
   };
 
+  // Bei jedem Wechsel: Darstellung (Hell/Dunkel) merken
+  const setDarkMode = (value) => {
+    setIsDark(value);
+    try {
+      window.localStorage.setItem("einkaufsradar_dark_mode", value ? "dark" : "light");
+    } catch (e) {
+      // ignorieren, falls nicht verfügbar
+    }
+  };
+
+  // Bei jedem Wechsel: Push-Benachrichtigung-Status merken
+  const toggleNotify = () => {
+    setNotify((n) => {
+      const next = !n;
+      try {
+        window.localStorage.setItem("einkaufsradar_notify", String(next));
+      } catch (e) {
+        // ignorieren, falls nicht verfügbar
+      }
+      return next;
+    });
+  };
+
   const handleShare = async () => {
     const topEntry = ranking[0];
-    const text = topEntry
-      ? `${topEntry.name} ist diese Woche in ${selectedState} am günstigsten – einkaufsradar.com`
-      : "einkaufsradar.com";
+    let text = "Einkaufsradar – der wöchentliche Lebensmittel-Preisvergleich für dein Bundesland – einkaufsradar.com";
+    if (topEntry) {
+      text = isOnlineDelivery
+        ? `${topEntry.name} ist diese Woche bei den Online-Lieferdiensten am günstigsten – einkaufsradar.com`
+        : `${topEntry.name} ist diese Woche in ${selectedState} am günstigsten – einkaufsradar.com`;
+    }
 
     // Natives Teilen-Menü, falls verfügbar (z. B. am Handy)
     if (navigator.share) {
@@ -186,6 +247,19 @@ export default function Home() {
           mask-position: 0 100%, 0 100%;
           transition: background-color 0.2s;
         }
+        button:not(:disabled) {
+          cursor: pointer;
+        }
+        /* Hover-Feedback nur bei echter Maus (Desktop) – auf Touchscreens
+           bliebe ein Hover-Zustand sonst nach dem Antippen hängen. */
+        @media (hover: hover) and (pointer: fine) {
+          button:not(:disabled) {
+            transition: filter 0.15s, transform 0.15s;
+          }
+          button:not(:disabled):hover {
+            filter: brightness(0.95);
+          }
+        }
       `}</style>
 
       <div className="max-w-md mx-auto px-5 pt-8 pb-16">
@@ -203,6 +277,16 @@ export default function Home() {
             </h1>
           </div>
           <div className="flex items-center gap-1">
+            {!selectedState && (
+              <button
+                aria-label="Teilen"
+                onClick={handleShare}
+                className="p-2 rounded-full active:scale-95 transition-transform"
+                style={{ color: t.sub }}
+              >
+                <Share2 size={20} />
+              </button>
+            )}
             <button
               aria-label="Monatsbestenliste"
               onClick={() => setMonthlyOpen(true)}
@@ -259,7 +343,7 @@ export default function Home() {
                 Bundesland wählen
               </h2>
               <button
-                onClick={() => setNotify((n) => !n)}
+                onClick={toggleNotify}
                 className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full"
                 style={{
                   background: notify ? t.green : "transparent",
@@ -288,6 +372,21 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            {/* Zusätzlicher, bundesweiter Punkt — bewusst unterhalb der Bundesländer und
+                doppelt so breit, damit er als sinnvoller Zusatz wirkt, nicht als 17. Bundesland */}
+            <button
+              onClick={() => chooseState(ONLINE_DELIVERY)}
+              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-4 mt-3 transition-transform active:scale-95"
+              style={{
+                background: t.cardBg,
+                border: `1.5px solid ${t.border}`,
+                color: t.ink,
+              }}
+            >
+              <Truck size={16} style={{ color: t.green }} />
+              <span className="font-semibold text-sm">Online-Lieferdienst</span>
+            </button>
           </>
         ) : (
           <>
@@ -316,7 +415,7 @@ export default function Home() {
                   {selectedState.toUpperCase()}
                 </div>
                 <div className="text-xs mono-font" style={{ color: t.sub }}>
-                  TOP 10 · {week.label} · {week.range}
+                  TOP {ranking.length} · {week.label} · {week.range}
                 </div>
               </div>
 
@@ -349,6 +448,22 @@ export default function Home() {
                         >
                           {rank}
                         </span>
+                        {entry.trend && (
+                          <span
+                            title={
+                              entry.trend === "up"
+                                ? "Besser als letzte Woche"
+                                : entry.trend === "down"
+                                ? "Schlechter als letzte Woche"
+                                : "Unverändert zur letzten Woche"
+                            }
+                            className="flex items-center flex-shrink-0"
+                          >
+                            {entry.trend === "up" && <ArrowUp size={14} strokeWidth={2.5} color={t.green} />}
+                            {entry.trend === "down" && <ArrowDown size={14} strokeWidth={2.5} color={t.amber} />}
+                            {entry.trend === "same" && <Minus size={14} strokeWidth={2.5} color={t.sub} />}
+                          </span>
+                        )}
                         <span className={`text-sm ${isPodium ? "font-bold" : "font-medium"}`} style={{ fontSize: isPodium ? "0.95rem" : undefined }}>
                           {entry.name}
                         </span>
@@ -430,14 +545,14 @@ export default function Home() {
                   </div>
                   <div className="flex rounded-full overflow-hidden border" style={{ borderColor: t.border }}>
                     <button
-                      onClick={() => setIsDark(false)}
+                      onClick={() => setDarkMode(false)}
                       className="px-3 py-1.5 text-xs font-medium"
                       style={{ background: !isDark ? t.green : "transparent", color: !isDark ? "#fff" : t.sub }}
                     >
                       Hell
                     </button>
                     <button
-                      onClick={() => setIsDark(true)}
+                      onClick={() => setDarkMode(true)}
                       className="px-3 py-1.5 text-xs font-medium"
                       style={{ background: isDark ? t.green : "transparent", color: isDark ? "#fff" : t.sub }}
                     >
@@ -462,9 +577,9 @@ export default function Home() {
                     {notify ? "Aktiv" : "Inaktiv"}
                   </span>
                 </div>
-                <p className="text-[11px]" style={{ color: t.sub }}>
-                  Bei aktivierter Benachrichtigung meldet sich Einkaufsradar jeden Montag um 8 Uhr mit
-                  dem neuen Ranking für dein gewähltes Bundesland. Ein-/ausschalten geht über den
+                <p className="text-xs" style={{ color: t.sub }}>
+                  Bei aktivierter Push-Benachrichtigung meldet sich Einkaufsradar jeden Montag um 8 Uhr mit
+                  dem neuen Ranking für dein Bundesland. Ein-/ausschalten geht über den
                   Button auf der Startseite.
                 </p>
 
@@ -479,7 +594,7 @@ export default function Home() {
                     </div>
                     <span className="text-xs" style={{ color: t.sub }}>bald verfügbar</span>
                   </div>
-                  <p className="text-[11px] mt-2" style={{ color: t.sub }}>
+                  <p className="text-xs mt-2" style={{ color: t.sub }}>
                     Öffnet dein Mail-Programm mit einer vorausgefüllten Nachricht an uns.
                   </p>
                 </div>
@@ -492,18 +607,25 @@ export default function Home() {
                 <p className="text-xs" style={{ color: t.sub }}>
                   Der jeweils günstigste Anbieter der Woche wird als Bester Preis ausgewiesen.
                   Alle weiteren Plätze zeigen, um wie viel Prozent sie im Vergleich dazu teurer
-                  ausfallen.
+                  ausfallen. Der kleine Pfeil neben dem Rang zeigt, ob sich eine Kette gegenüber
+                  der Vorwoche verbessert oder verschlechtert hat.
                 </p>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
-                  <p className="text-[11px]" style={{ color: t.sub }}>
-                    Die Rangfolge basiert auf einem festen Warenkorb aus Alltagsprodukten (Milch,
-                    Brot, Eier, Nudeln u.a.) sowie den aktuellen Wochenangeboten je Händler.
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Bundesländer</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Die Rangfolge basiert auf einem festen Warenkorb aus Alltagsprodukten
+                    (Getreideprodukte, Milchprodukte, Fleisch, Fisch, Eier, Kartoffeln, Gemüse,
+                    Obst, Hülsenfrüchte, Pflanzliche Produkte und Wasser) sowie den aktuellen
+                    Wochenangeboten je Händler. Die Gewichtung liegt bei 65 % Alltagsprodukten und
+                    35 % Angeboten.
                   </p>
                 </div>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
-                  <p className="text-[11px]" style={{ color: t.sub }}>
-                    Die angezeigten Werte sind Durchschnittswerte auf Bundeslandebene. Tatsächliche
-                    Preise können je nach Filiale, Stadt oder Kommune leicht abweichen.
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Online-Lieferdienst</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Da sich die Sortimente der Anbieter leicht unterscheiden, ist ein fester
+                    Warenkorbvergleich hier nicht sachgerecht. Bewertet werden daher
+                    ausschließlich die aktuellen Wochenangebote.
                   </p>
                 </div>
               </div>
@@ -516,11 +638,18 @@ export default function Home() {
                   <p className="text-sm font-medium">Über Einkaufsradar</p>
                 </div>
                 <p className="text-xs" style={{ color: t.sub }}>
-                  Einkaufsradar ermittelt jede Woche, in welchem Bundesland der
-                  Lebensmitteleinkauf am günstigsten ausfällt. Verlässlich recherchiert,
-                  ganz ohne mühsames Blättern durch Prospekte.
+                  Einkaufsradar ermittelt jede Woche, in welchem Supermarkt deines
+                  Bundeslandes der Lebensmitteleinkauf am günstigsten ausfällt. Verlässlich
+                  recherchiert, erspart dir den mühsamen Preisvergleich und das Blättern
+                  durch Prospekte.
                 </p>
-                <div className="text-xs space-y-1" style={{ color: t.sub }}>
+                <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Die angezeigten Werte sind Durchschnittswerte auf Bundeslandebene. Tatsächliche
+                    Preise können je nach Filiale, Stadt oder Kommune leicht abweichen.
+                  </p>
+                </div>
+                <div className="border-t border-dashed pt-3 mt-2 text-xs space-y-1" style={{ borderColor: t.border, color: t.sub }}>
                   <div className="flex justify-between"><span>Version</span><span className="mono-font">0.3 · Prototyp</span></div>
                   <div className="flex justify-between"><span>Datenstand</span><span className="mono-font">{week.label}</span></div>
                   <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">Mo. 08:00</span></div>
