@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Minus, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2, Truck } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 const THEMES = {
   light: {
@@ -56,40 +57,49 @@ const STATE_CHAINS = {
 const ONLINE_DELIVERY = "Online-Lieferdienst";
 const ONLINE_CHAINS = ["Rewe", "myTime", "Edeka24", "Flaschenpost", "Knuspr", "Picnic", "Flink"];
 
-// Berechnet Prozent-Differenz zum Guenstigsten (Platz 1 = "Bester Preis").
-// Maximale Differenz ist bewusst auf 30% begrenzt, damit die Werte realistisch wirken.
-function seededScores(seed, chains) {
-  if (!chains || chains.length === 0) return [];
-  let s = seed;
-  const rand = () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-  const raw = chains.map((name) => ({ name, raw: rand() * 30 }));
-  raw.sort((a, b) => a.raw - b.raw);
-  const minRaw = raw[0].raw;
-  return raw.map((entry) => ({
-    name: entry.name,
-    diffPercent: Math.round(entry.raw - minRaw),
-  }));
+// Berechnet automatisch die letzten "numWeeks" Kalenderwochen bis zur aktuellen.
+// Ersetzt die vorherige feste Liste — läuft dadurch nie mehr "aus der Zeit",
+// da jede Woche montags automatisch die neue KW nachrückt.
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function hashOf(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 100000;
-  return h + 1;
+function getISOWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-const WEEKS = [
-  { label: "KW 26", range: "22.06 – 28.06" },
-  { label: "KW 27", range: "29.06 – 05.07" },
-  { label: "KW 28", range: "06.07 – 12.07" },
-  { label: "KW 29", range: "13.07 – 19.07" },
-  { label: "KW 30", range: "20.07 – 26.07" },
-  { label: "KW 31", range: "27.07 – 02.08" },
-  { label: "KW 32", range: "03.08 – 09.08" },
-  { label: "KW 33", range: "10.08 – 16.08" },
-];
+function formatDayMonth(date) {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  return `${dd}.${mm}`;
+}
+
+function buildWeeks(numWeeks) {
+  const weeks = [];
+  const currentMonday = getMonday(new Date());
+  for (let i = numWeeks - 1; i >= 0; i--) {
+    const monday = new Date(currentMonday);
+    monday.setDate(monday.getDate() - i * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    weeks.push({
+      label: `KW ${getISOWeekNumber(monday)}`,
+      range: `${formatDayMonth(monday)} – ${formatDayMonth(sunday)}`,
+    });
+  }
+  return weeks;
+}
+
+const WEEKS = buildWeeks(10);
 
 export default function Home() {
   const [weekIdx, setWeekIdx] = useState(WEEKS.length - 1);
@@ -100,35 +110,93 @@ export default function Home() {
   const [settingsTab, setSettingsTab] = useState("general");
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [shareMsg, setShareMsg] = useState("");
+  const [ranking, setRanking] = useState([]);
 
   const t = isDark ? THEMES.dark : THEMES.light;
   const week = WEEKS[weekIdx];
   const isOnlineDelivery = selectedState === ONLINE_DELIVERY;
 
-  const ranking = useMemo(() => {
-    if (!selectedState) return [];
-    const chains = isOnlineDelivery ? ONLINE_CHAINS : (STATE_CHAINS[selectedState] || []);
-    const currentWeek = WEEKS[weekIdx];
-    const current = seededScores(hashOf(selectedState + currentWeek.label), chains);
-
-    // Trend bezieht sich bewusst ausschließlich auf die direkte Vorwoche, nie kumulativ.
-    if (weekIdx === 0) {
-      return current.map((entry) => ({ ...entry, trend: null }));
+  // Preise aus Supabase laden, sobald sich Bundesland oder Woche ändern.
+  // Ersetzt die frühere Zufallsfunktion "seededScores" durch echte Datenbankwerte.
+  useEffect(() => {
+    if (!selectedState) {
+      setRanking([]);
+      return;
     }
-    const prevWeek = WEEKS[weekIdx - 1];
-    const previous = seededScores(hashOf(selectedState + prevWeek.label), chains);
-    const prevRankByName = {};
-    previous.forEach((entry, i) => { prevRankByName[entry.name] = i + 1; });
 
-    return current.map((entry, i) => {
-      const currentRank = i + 1;
-      const prevRank = prevRankByName[entry.name];
-      let trend = null;
-      if (prevRank !== undefined) {
-        trend = currentRank < prevRank ? "up" : currentRank > prevRank ? "down" : "same";
+    let isCancelled = false;
+
+    async function loadRanking() {
+      const currentWeek = WEEKS[weekIdx];
+
+      const { data: currentData, error: currentError } = await supabase
+        .from("preise")
+        .select("chain, price")
+        .eq("region", selectedState)
+        .eq("week", currentWeek.label);
+
+      if (currentError) {
+        console.error("Fehler beim Laden der Preise:", currentError);
+        if (!isCancelled) setRanking([]);
+        return;
       }
-      return { ...entry, trend };
-    });
+      if (!currentData || currentData.length === 0) {
+        if (!isCancelled) setRanking([]);
+        return;
+      }
+
+      // Günstigster zuerst; daraus die Prozent-Differenz berechnen (Platz 1 = "Bester Preis")
+      const sortedCurrent = [...currentData].sort((a, b) => a.price - b.price);
+      const bestPrice = sortedCurrent[0].price;
+      const currentRanking = sortedCurrent.map((entry) => ({
+        name: entry.chain,
+        diffPercent: Math.round(((entry.price - bestPrice) / bestPrice) * 100),
+      }));
+
+      // Erste Woche im Kalender: kein Vorwochen-Vergleich möglich
+      if (weekIdx === 0) {
+        if (!isCancelled) {
+          setRanking(currentRanking.map((entry) => ({ ...entry, trend: null })));
+        }
+        return;
+      }
+
+      // Vorwoche holen, um den Trend-Pfeil zu berechnen.
+      // Trend bezieht sich bewusst ausschließlich auf die direkte Vorwoche, nie kumulativ.
+      const prevWeek = WEEKS[weekIdx - 1];
+      const { data: prevData } = await supabase
+        .from("preise")
+        .select("chain, price")
+        .eq("region", selectedState)
+        .eq("week", prevWeek.label);
+
+      if (!prevData || prevData.length === 0) {
+        if (!isCancelled) {
+          setRanking(currentRanking.map((entry) => ({ ...entry, trend: null })));
+        }
+        return;
+      }
+
+      const sortedPrev = [...prevData].sort((a, b) => a.price - b.price);
+      const prevRankByName = {};
+      sortedPrev.forEach((entry, i) => { prevRankByName[entry.chain] = i + 1; });
+
+      const finalRanking = currentRanking.map((entry, i) => {
+        const currentRank = i + 1;
+        const prevRank = prevRankByName[entry.name];
+        let trend = null;
+        if (prevRank !== undefined) {
+          trend = currentRank < prevRank ? "up" : currentRank > prevRank ? "down" : "same";
+        }
+        return { ...entry, trend };
+      });
+
+      if (!isCancelled) setRanking(finalRanking);
+    }
+
+    loadRanking();
+
+    return () => { isCancelled = true; };
   }, [selectedState, isOnlineDelivery, weekIdx]);
 
   // Beim ersten Laden: zuletzt gewähltes Bundesland, Darstellung und Push-Status wiederherstellen
@@ -250,7 +318,7 @@ export default function Home() {
         button:not(:disabled) {
           cursor: pointer;
         }
-        /* Hover-Feedback nur bei echter Maus (Desktop) – auf Touchscreens
+        /* Hover-Feedback nur bei echter Maus (Desktop) — auf Touchscreens
            bliebe ein Hover-Zustand sonst nach dem Antippen hängen. */
         @media (hover: hover) and (pointer: fine) {
           button:not(:disabled) {
@@ -490,7 +558,7 @@ export default function Home() {
             <div className="torn-bottom" />
 
             <p className="text-center text-xs mt-4" style={{ color: t.sub }}>
-              Aktualisiert · Montag 08:00 Uhr
+              Aktualisiert · Sonntag 18:00 Uhr
             </p>
           </>
         )}
@@ -578,7 +646,7 @@ export default function Home() {
                   </span>
                 </div>
                 <p className="text-xs" style={{ color: t.sub }}>
-                  Bei aktivierter Push-Benachrichtigung meldet sich Einkaufsradar jeden Montag um 8 Uhr mit
+                  Bei aktivierter Push-Benachrichtigung meldet sich Einkaufsradar jeden Sonntag um 18 Uhr mit
                   dem neuen Ranking für dein Bundesland. Ein-/ausschalten geht über den
                   Button auf der Startseite.
                 </p>
@@ -652,7 +720,7 @@ export default function Home() {
                 <div className="border-t border-dashed pt-3 mt-2 text-xs space-y-1" style={{ borderColor: t.border, color: t.sub }}>
                   <div className="flex justify-between"><span>Version</span><span className="mono-font">0.3 · Prototyp</span></div>
                   <div className="flex justify-between"><span>Datenstand</span><span className="mono-font">{week.label}</span></div>
-                  <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">Mo. 08:00</span></div>
+                  <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">So. 18:00</span></div>
                 </div>
               </div>
             )}
