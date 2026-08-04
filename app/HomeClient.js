@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Minus, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2, Truck } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 
+const FEEDBACK_EMAIL = "einkaufsradar@gmail.com";
+
 const THEMES = {
   light: {
     pageBg: "#EEF1EA",
@@ -119,6 +121,18 @@ function getPreviousMonthWeeks(weeksList) {
   );
 }
 
+function getCurrentMonthLabel() {
+  const now = new Date();
+  return `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+function getDaysUntilNextEvaluation() {
+  const now = new Date();
+  const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const diffMs = firstOfNextMonth.getTime() - now.getTime();
+  return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+}
+
 export default function HomeClient() {
   const [weekIdx, setWeekIdx] = useState(WEEKS.length - 1);
   const [selectedState, setSelectedState] = useState(null);
@@ -129,6 +143,8 @@ export default function HomeClient() {
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [shareMsg, setShareMsg] = useState("");
   const [ranking, setRanking] = useState([]);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [monthlyTop, setMonthlyTop] = useState([]);
   const [monthlyTotalWeeks, setMonthlyTotalWeeks] = useState(0);
 
@@ -139,12 +155,15 @@ export default function HomeClient() {
   useEffect(() => {
     if (!selectedState) {
       setRanking([]);
+      setLoadError(false);
       return;
     }
 
     let isCancelled = false;
 
     async function loadRanking() {
+      setRankingLoading(true);
+      setLoadError(false);
       const currentWeek = WEEKS[weekIdx];
 
       const { data: currentData, error: currentError } = await supabase
@@ -155,11 +174,18 @@ export default function HomeClient() {
 
       if (currentError) {
         console.error("Fehler beim Laden der Preise:", currentError);
-        if (!isCancelled) setRanking([]);
+        if (!isCancelled) {
+          setRanking([]);
+          setLoadError(true);
+          setRankingLoading(false);
+        }
         return;
       }
       if (!currentData || currentData.length === 0) {
-        if (!isCancelled) setRanking([]);
+        if (!isCancelled) {
+          setRanking([]);
+          setRankingLoading(false);
+        }
         return;
       }
 
@@ -173,6 +199,7 @@ export default function HomeClient() {
       if (weekIdx === 0) {
         if (!isCancelled) {
           setRanking(currentRanking.map((entry) => ({ ...entry, trend: null })));
+          setRankingLoading(false);
         }
         return;
       }
@@ -187,6 +214,7 @@ export default function HomeClient() {
       if (!prevData || prevData.length === 0) {
         if (!isCancelled) {
           setRanking(currentRanking.map((entry) => ({ ...entry, trend: null })));
+          setRankingLoading(false);
         }
         return;
       }
@@ -205,7 +233,10 @@ export default function HomeClient() {
         return { ...entry, trend };
       });
 
-      if (!isCancelled) setRanking(finalRanking);
+      if (!isCancelled) {
+        setRanking(finalRanking);
+        setRankingLoading(false);
+      }
     }
 
     loadRanking();
@@ -279,8 +310,14 @@ export default function HomeClient() {
       const savedState = window.localStorage.getItem("einkaufsradar_last_state");
       const isValidSaved = savedState && (STATE_CHAINS[savedState] || savedState === ONLINE_DELIVERY);
       if (isValidSaved) setSelectedState(savedState);
+
       const savedDark = window.localStorage.getItem("einkaufsradar_dark_mode");
-      if (savedDark) setIsDark(savedDark === "dark");
+      if (savedDark) {
+        setIsDark(savedDark === "dark");
+      } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        setIsDark(true);
+      }
+
       const savedNotify = window.localStorage.getItem("einkaufsradar_notify");
       if (savedNotify) setNotify(savedNotify === "true");
     } catch (e) {
@@ -354,6 +391,8 @@ export default function HomeClient() {
       setTimeout(() => setShareMsg(""), 2000);
     }
   };
+
+  const feedbackMailto = "mailto:" + FEEDBACK_EMAIL + "?subject=" + encodeURIComponent("Feedback zu Einkaufsradar");
 
   return (
     <div
@@ -493,36 +532,50 @@ export default function HomeClient() {
 
               <div className="border-t border-dashed mb-2" style={{ borderColor: t.border }} />
 
-              <div className="space-y-2">
-                {ranking.map((entry, i) => {
-                  const rank = i + 1;
-                  const isTop = rank === 1;
-                  const isPodium = rank <= 3;
-                  const medalColor = rank === 1 ? "#D4AF37" : rank === 2 ? "#A8A8A8" : rank === 3 ? "#B5651D" : null;
-                  return (
-                    <div key={entry.name} className={`flex items-center justify-between px-3 rounded-lg ${isPodium ? "py-2.5" : "py-1.5"}`} style={{ background: isPodium ? `${medalColor}1A` : "transparent", border: isPodium ? `1px solid ${medalColor}55` : "none", borderBottom: !isPodium && i < ranking.length - 1 ? `1px dotted ${t.border}` : undefined }}>
-                      <div className="flex items-center gap-3">
-                        <span className="mono-font text-xs font-bold w-6 h-6 flex items-center justify-center rounded" style={{ color: isPodium ? "#fff" : t.ink, background: isPodium ? medalColor : "transparent" }}>
-                          {rank}
-                        </span>
-                        {entry.trend && (
-                          <span title={entry.trend === "up" ? "Besser als letzte Woche" : entry.trend === "down" ? "Schlechter als letzte Woche" : "Unverändert zur letzten Woche"} className="flex items-center flex-shrink-0">
-                            {entry.trend === "up" && <ArrowUp size={14} strokeWidth={2.5} color={t.green} />}
-                            {entry.trend === "down" && <ArrowDown size={14} strokeWidth={2.5} color={t.amber} />}
-                            {entry.trend === "same" && <Minus size={14} strokeWidth={2.5} color={t.sub} />}
+              {loadError && (
+                <p className="text-sm text-center py-6" style={{ color: t.sub }}>
+                  Die Preise konnten gerade nicht geladen werden. Bitte versuch es später erneut.
+                </p>
+              )}
+
+              {!loadError && !rankingLoading && ranking.length === 0 && (
+                <p className="text-sm text-center py-6" style={{ color: t.sub }}>
+                  Für {selectedState} liegen für {week.label} noch keine Preise vor.
+                </p>
+              )}
+
+              {!loadError && ranking.length > 0 && (
+                <div className="space-y-2">
+                  {ranking.map((entry, i) => {
+                    const rank = i + 1;
+                    const isTop = rank === 1;
+                    const isPodium = rank <= 3;
+                    const medalColor = rank === 1 ? "#D4AF37" : rank === 2 ? "#A8A8A8" : rank === 3 ? "#B5651D" : null;
+                    return (
+                      <div key={entry.name} className={`flex items-center justify-between px-3 rounded-lg ${isPodium ? "py-2.5" : "py-1.5"}`} style={{ background: isPodium ? `${medalColor}1A` : "transparent", border: isPodium ? `1px solid ${medalColor}55` : "none", borderBottom: !isPodium && i < ranking.length - 1 ? `1px dotted ${t.border}` : undefined }}>
+                        <div className="flex items-center gap-3">
+                          <span className="mono-font text-xs font-bold w-6 h-6 flex items-center justify-center rounded" style={{ color: isPodium ? "#fff" : t.ink, background: isPodium ? medalColor : "transparent" }}>
+                            {rank}
                           </span>
-                        )}
-                        <span className={`text-sm ${isPodium ? "font-bold" : "font-medium"}`} style={{ fontSize: isPodium ? "0.95rem" : undefined }}>
-                          {entry.name}
+                          {entry.trend && (
+                            <span title={entry.trend === "up" ? "Besser als letzte Woche" : entry.trend === "down" ? "Schlechter als letzte Woche" : "Unverändert zur letzten Woche"} className="flex items-center flex-shrink-0">
+                              {entry.trend === "up" && <ArrowUp size={14} strokeWidth={2.5} color={t.green} />}
+                              {entry.trend === "down" && <ArrowDown size={14} strokeWidth={2.5} color={t.amber} />}
+                              {entry.trend === "same" && <Minus size={14} strokeWidth={2.5} color={t.sub} />}
+                            </span>
+                          )}
+                          <span className={`text-sm ${isPodium ? "font-bold" : "font-medium"}`} style={{ fontSize: isPodium ? "0.95rem" : undefined }}>
+                            {entry.name}
+                          </span>
+                        </div>
+                        <span className="mono-font text-sm font-semibold" style={{ color: isTop ? t.green : t.ink }}>
+                          {isTop ? "Bester Preis" : `+${Math.max(1, entry.diffPercent)}% Teurer`}
                         </span>
                       </div>
-                      <span className="mono-font text-sm font-semibold" style={{ color: isTop ? t.green : t.ink }}>
-                        {isTop ? "Bester Preis" : `+${Math.max(1, entry.diffPercent)}% Teurer`}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="border-t border-dashed mt-3 pt-3" style={{ borderColor: t.border }}>
                 <button onClick={() => { setSettingsOpen(true); setSettingsTab("scoring"); }} className="text-[11px] leading-snug underline decoration-dotted text-left" style={{ color: t.sub }}>
@@ -592,13 +645,13 @@ export default function HomeClient() {
                 </p>
 
                 <div className="border-t border-dashed pt-4 mt-1" style={{ borderColor: t.border }}>
-                  <div className="flex items-center justify-between rounded-xl px-3 py-2.5 opacity-60" style={{ background: t.pageBg }}>
-                    <div className="flex items-center gap-2">
+                  <a href={feedbackMailto} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: t.pageBg, textDecoration: "none" }}>
+                    <span className="flex items-center gap-2">
                       <Mail size={16} style={{ color: t.sub }} />
-                      <span className="text-sm font-medium">Feedback senden</span>
-                    </div>
-                    <span className="text-xs" style={{ color: t.sub }}>bald verfügbar</span>
-                  </div>
+                      <span className="text-sm font-medium" style={{ color: t.ink }}>Feedback senden</span>
+                    </span>
+                    <span className="text-xs" style={{ color: t.green }}>öffnen</span>
+                  </a>
                   <p className="text-xs mt-2" style={{ color: t.sub }}>
                     Öffnet dein Mail-Programm mit einer vorausgefüllten Nachricht an uns.
                   </p>
@@ -655,12 +708,16 @@ export default function HomeClient() {
       {monthlyOpen && (
         <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50" style={{ background: "#00000066" }} onClick={() => setMonthlyOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-2xl sm:rounded-2xl px-5 pt-5 pb-8 sm:pb-6" style={{ background: t.cardBg, color: t.ink }}>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="display-font text-base">MONATSBESTENLISTE</h2>
               <button aria-label="Schließen" onClick={() => setMonthlyOpen(false)} style={{ color: t.sub }}>
                 <X size={20} />
               </button>
             </div>
+
+            <p className="text-[11px] text-center mb-4" style={{ color: t.sub }}>
+              Bestenliste für {getCurrentMonthLabel()} in {getDaysUntilNextEvaluation()} {getDaysUntilNextEvaluation() === 1 ? "Tag" : "Tagen"} verfügbar
+            </p>
 
             {selectedState && (
               <div className="text-center mb-4">
