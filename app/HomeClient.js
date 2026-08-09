@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Minus, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2, Truck } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Minus, Bell, TrendingDown, Settings, X, Sun, Moon, Info, Mail, Trophy, Share2, Truck, FileText, Shield, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 
 const FEEDBACK_EMAIL = "einkaufsradar@gmail.com";
@@ -466,9 +466,21 @@ export default function HomeClient() {
             </button>
           </div>
         </div>
-        <p className="text-sm mb-6 text-center" style={{ color: t.sub }}>
+        <p className="text-sm mb-3 text-center" style={{ color: t.sub }}>
           Der wöchentliche Lebensmittel-Preisvergleich für dein Bundesland.
         </p>
+
+        <div
+          className="flex items-start gap-2 rounded-lg px-3 py-2 mb-5"
+          style={{ background: `${t.amber}1A`, border: `1px solid ${t.amber}55` }}
+        >
+          <AlertCircle size={14} style={{ color: t.amber, marginTop: 2, flexShrink: 0 }} />
+          <p className="text-xs leading-snug" style={{ color: t.sub }}>
+            Einkaufsradar befindet sich im Testbetrieb. Die angezeigten Werte sind
+            aktuell noch Testdaten und werden schrittweise durch recherchierte
+            Werte ersetzt.
+          </p>
+        </div>
 
         <div className="flex items-center justify-between rounded-xl px-4 py-3 mb-6 mono-font" style={{ background: t.ink, color: t.pageBg }}>
           <button aria-label="Vorherige Woche" onClick={() => setWeekIdx((i) => Math.max(0, i - 1))} disabled={weekIdx === 0} className="p-1 disabled:opacity-30">
@@ -602,10 +614,11 @@ export default function HomeClient() {
               </button>
             </div>
 
-            <div className="flex gap-2 mb-5">
+            <div className="flex gap-2 mb-5 flex-wrap">
               {[
                 { id: "general", label: "Allgemein" },
                 { id: "scoring", label: "Bewertung" },
+                { id: "hints", label: "Hinweise" },
                 { id: "about", label: "Über" },
               ].map((tab) => (
                 <button key={tab.id} onClick={() => setSettingsTab(tab.id)} className="text-xs font-medium px-3 py-1.5 rounded-full" style={{ background: settingsTab === tab.id ? t.green : "transparent", color: settingsTab === tab.id ? "#fff" : t.sub, border: `1px solid ${settingsTab === tab.id ? t.green : t.border}` }}>
@@ -662,19 +675,63 @@ export default function HomeClient() {
             {settingsTab === "scoring" && (
               <div className="space-y-3">
                 <p className="text-sm font-medium">So entsteht die Rangliste</p>
-                <p className="text-xs" style={{ color: t.sub }}>
-                  Der jeweils günstigste Anbieter der Woche wird als Bester Preis ausgewiesen. Alle weiteren Plätze zeigen, um wie viel Prozent sie im Vergleich dazu teurer ausfallen. Der kleine Pfeil neben dem Rang zeigt, ob sich eine Kette gegenüber der Vorwoche verbessert oder verschlechtert hat.
-                </p>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
                   <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Bundesländer</p>
                   <p className="text-xs" style={{ color: t.sub }}>
-                    Die Rangfolge basiert auf einem festen Warenkorb aus Alltagsprodukten (Getreideprodukte, Milchprodukte, Fleisch, Fisch, Eier, Kartoffeln, Gemüse, Obst, Hülsenfrüchte, Pflanzliche Produkte und Wasser) sowie den aktuellen Wochenangeboten je Händler. Die Gewichtung liegt bei 65 % Alltagsprodukten und 35 % Angeboten.
+                    Bei Handelsketten mit einem öffentlich einsehbaren Online-Shop werden
+                    zusätzlich die dort veröffentlichten Preise ausgewählter Alltagsprodukte
+                    einbezogen. Bei Ketten ohne einen solchen öffentlichen Online-Vergleich
+                    fließen ausschließlich die Wochenangebote in die Bewertung ein. Die
+                    Gewichtung zwischen beiden Bestandteilen kann sich daher von Kette zu
+                    Kette unterscheiden.
                   </p>
                 </div>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
                   <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Online-Lieferdienst</p>
                   <p className="text-xs" style={{ color: t.sub }}>
-                    Da sich die Sortimente der Anbieter leicht unterscheiden, ist ein fester Warenkorbvergleich hier nicht sachgerecht. Bewertet werden daher ausschließlich die aktuellen Wochenangebote.
+                    Da sich die Sortimente der Anbieter leicht unterscheiden, ist ein fester
+                    Warenkorbvergleich hier nicht sachgerecht. Bewertet werden daher
+                    ausschließlich die aktuellen Wochenangebote.
+                  </p>
+                </div>
+                <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Alltagsprodukte</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Zu den berücksichtigten Alltagsprodukten zählen: Getreideprodukte,
+                    Milchprodukte, Fleisch, Fisch, Eier, Kartoffeln, Gemüse, Obst,
+                    Hülsenfrüchte, Pflanzliche Produkte und Wasser.
+                  </p>
+                </div>
+                <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Wochenangebote</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Diese werden direkt aus den veröffentlichten Prospekten und Angebotsseiten
+                    der jeweiligen Handelskette erhoben.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {settingsTab === "hints" && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Wichtiger Hinweis</p>
+                <p className="text-xs" style={{ color: t.sub }}>
+                  Alle Angaben beruhen auf eigenen, händisch durchgeführten
+                  Stichproben-Erhebungen aus öffentlich zugänglichen Quellen (Prospekte,
+                  Online-Shops der Händler) zu einem bestimmten Zeitpunkt. Sie erheben
+                  keinen Anspruch auf Vollständigkeit, Repräsentativität oder taggenaue
+                  Aktualität und können von den tatsächlichen Preisen vor Ort abweichen.
+                  "Bester Preis" bezeichnet das Ergebnis unserer Erhebung, keine geprüfte,
+                  absolute Tatsache. Solltest du eine Abweichung feststellen, kontaktiere
+                  uns gerne über einkaufsradar@gmail.com – wir korrigieren gemeldete
+                  Fehler umgehend.
+                </p>
+                <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Hinweis</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Die angezeigten Werte sind Durchschnittswerte auf Bundeslandebene.
+                    Tatsächliche Preise können je nach Filiale, Stadt oder Kommune leicht
+                    abweichen.
                   </p>
                 </div>
               </div>
@@ -687,17 +744,40 @@ export default function HomeClient() {
                   <p className="text-sm font-medium">Über Einkaufsradar</p>
                 </div>
                 <p className="text-xs" style={{ color: t.sub }}>
-                  Einkaufsradar ermittelt jede Woche, in welchem Supermarkt deines Bundeslandes der Lebensmitteleinkauf am günstigsten ausfällt. Verlässlich recherchiert, erspart dir den mühsamen Preisvergleich und das Blättern durch Prospekte.
+                  Einkaufsradar ermittelt jede Woche, in welchem Supermarkt deines
+                  Bundeslandes der Lebensmitteleinkauf am günstigsten ausfällt. Verlässlich
+                  recherchiert, erspart dir den mühsamen Preisvergleich und das Blättern
+                  durch Prospekte.
                 </p>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Testbetrieb</p>
                   <p className="text-xs" style={{ color: t.sub }}>
-                    Die angezeigten Werte sind Durchschnittswerte auf Bundeslandebene. Tatsächliche Preise können je nach Filiale, Stadt oder Kommune leicht abweichen.
+                    Einkaufsradar befindet sich aktuell im Testbetrieb. Die angezeigten
+                    Werte sind noch Testdaten und werden schrittweise durch recherchierte
+                    Werte ersetzt.
                   </p>
                 </div>
                 <div className="border-t border-dashed pt-3 mt-2 text-xs space-y-1" style={{ borderColor: t.border, color: t.sub }}>
                   <div className="flex justify-between"><span>Version</span><span className="mono-font">01.08.26 · BETA</span></div>
                   <div className="flex justify-between"><span>Datenstand</span><span className="mono-font">{week.label}</span></div>
                   <div className="flex justify-between"><span>Nächstes Update</span><span className="mono-font">So. 18:00</span></div>
+                </div>
+
+                <div className="border-t border-dashed pt-3 mt-2 space-y-1" style={{ borderColor: t.border }}>
+                  <a href="/impressum" className="flex items-center justify-between py-1.5" style={{ textDecoration: "none" }}>
+                    <span className="flex items-center gap-2">
+                      <FileText size={14} style={{ color: t.sub }} />
+                      <span className="text-xs font-medium" style={{ color: t.ink }}>Impressum</span>
+                    </span>
+                    <span className="text-xs" style={{ color: t.sub }}>&rsaquo;</span>
+                  </a>
+                  <a href="/datenschutz" className="flex items-center justify-between py-1.5" style={{ textDecoration: "none" }}>
+                    <span className="flex items-center gap-2">
+                      <Shield size={14} style={{ color: t.sub }} />
+                      <span className="text-xs font-medium" style={{ color: t.ink }}>Datenschutzerklärung</span>
+                    </span>
+                    <span className="text-xs" style={{ color: t.sub }}>&rsaquo;</span>
+                  </a>
                 </div>
               </div>
             )}
