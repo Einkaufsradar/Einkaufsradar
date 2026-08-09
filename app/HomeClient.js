@@ -683,7 +683,9 @@ export default function HomeClient() {
                     einbezogen. Bei Ketten ohne einen solchen öffentlichen Online-Vergleich
                     fließen ausschließlich die Wochenangebote in die Bewertung ein. Die
                     Gewichtung zwischen beiden Bestandteilen kann sich daher von Kette zu
-                    Kette unterscheiden.
+                    Kette unterscheiden. Bei kleineren, regionalen Handelsketten kann die
+                    verfügbare Datengrundlage insgesamt dünner ausfallen als bei
+                    bundesweit vertretenen Ketten.
                   </p>
                 </div>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
@@ -699,7 +701,9 @@ export default function HomeClient() {
                   <p className="text-xs" style={{ color: t.sub }}>
                     Zu den berücksichtigten Alltagsprodukten zählen: Getreideprodukte,
                     Milchprodukte, Fleisch, Fisch, Eier, Kartoffeln, Gemüse, Obst,
-                    Hülsenfrüchte, Pflanzliche Produkte und Wasser.
+                    Hülsenfrüchte, Pflanzliche Produkte und Wasser. Die verglichenen
+                    Produkte können sich in Marke, Verpackungsgröße oder Rezeptur
+                    unterscheiden.
                   </p>
                 </div>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
@@ -709,6 +713,7 @@ export default function HomeClient() {
                     der jeweiligen Handelskette erhoben.
                   </p>
                 </div>
+                <p className="text-xs mt-4" style={{ color: t.sub }}>Stand: August 2026</p>
               </div>
             )}
 
@@ -724,16 +729,28 @@ export default function HomeClient() {
                   "Bester Preis" bezeichnet das Ergebnis unserer Erhebung, keine geprüfte,
                   absolute Tatsache. Solltest du eine Abweichung feststellen, kontaktiere
                   uns gerne über einkaufsradar@gmail.com – wir korrigieren gemeldete
-                  Fehler umgehend.
+                  Fehler umgehend. Einkaufsradar erhebt keinen Anspruch auf eine bestimmte
+                  Ersparnis und dient ausschließlich der allgemeinen Orientierung, nicht
+                  als Kauf- oder Finanzberatung.
                 </p>
                 <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
                   <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Hinweis</p>
                   <p className="text-xs" style={{ color: t.sub }}>
                     Die angezeigten Werte sind Durchschnittswerte auf Bundeslandebene.
                     Tatsächliche Preise können je nach Filiale, Stadt oder Kommune leicht
-                    abweichen.
+                    abweichen. Auch kann sich der Preis im Online-Shop einer Kette von dem
+                    Preis derselben Kette vor Ort in der Filiale unterscheiden.
                   </p>
                 </div>
+                <div className="border-t border-dashed pt-3 mt-2" style={{ borderColor: t.border }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Markenrechtlicher Hinweis</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Alle genannten Marken- und Unternehmensnamen sind Eigentum der
+                    jeweiligen Inhaber. Es besteht keine Verbindung oder Zusammenarbeit
+                    mit Einkaufsradar.
+                  </p>
+                </div>
+                <p className="text-xs mt-4" style={{ color: t.sub }}>Stand: August 2026</p>
               </div>
             )}
 
