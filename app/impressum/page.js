@@ -6,24 +6,6 @@ export default function Impressum() {
       <div className="max-w-md mx-auto px-5 py-10">
         <h1 className="text-xl font-bold mb-6">Impressum</h1>
 
-        <p className="text-sm font-semibold mb-1">Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz)</p>
-        <p className="text-sm leading-relaxed mb-4">
-          Yannis Peer<br />
-          [Anschrift wird ergänzt]<br />
-          Deutschland
-        </p>
-
-        <p className="text-sm font-semibold mb-1">Kontakt</p>
-        <p className="text-sm leading-relaxed mb-4">
-          E-Mail: einkaufsradar@gmail.com
-        </p>
-
-        <p className="text-sm font-semibold mb-1">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</p>
-        <p className="text-sm leading-relaxed mb-4">
-          Yannis Peer<br />
-          [Anschrift wird ergänzt]
-        </p>
-
         <p className="text-sm font-semibold mb-1">Haftung für Inhalte</p>
         <p className="text-sm leading-relaxed mb-4">
           Die Inhalte dieser Website wurden mit größter Sorgfalt erstellt. Für die
@@ -50,6 +32,29 @@ export default function Impressum() {
           Die durch den Seitenbetreiber erstellten Inhalte und Werke auf dieser
           Website unterliegen dem deutschen Urheberrecht. Beiträge Dritter sind als
           solche gekennzeichnet.
+        </p>
+
+        <p className="text-sm font-semibold mb-1">Verfügbarkeit</p>
+        <p className="text-sm leading-relaxed mb-4">
+          Es besteht kein Anspruch auf ständige Verfügbarkeit der Website.
+        </p>
+
+        <p className="text-sm font-semibold mb-1">Kontakt</p>
+        <p className="text-sm leading-relaxed mb-4">
+          E-Mail: einkaufsradar@gmail.com
+        </p>
+
+        <p className="text-sm font-semibold mb-1">Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz)</p>
+        <p className="text-sm leading-relaxed mb-4">
+          Yannis Peer<br />
+          [Anschrift wird ergänzt]<br />
+          Deutschland
+        </p>
+
+        <p className="text-sm font-semibold mb-1">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</p>
+        <p className="text-sm leading-relaxed mb-6">
+          Yannis Peer<br />
+          [Anschrift wird ergänzt]
         </p>
 
         <a href="/" className="text-sm underline" style={{ color: "#2F6F4E" }}>

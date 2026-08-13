@@ -101,6 +101,16 @@ function buildWeeks(numWeeks) {
   return weeks;
 }
 
+function formatErhobenDate(isoDateString) {
+  if (!isoDateString) return null;
+  const d = new Date(isoDateString);
+  if (isNaN(d.getTime())) return null;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}.${mm}.${yyyy}`;
+}
+
 const WEEKS = buildWeeks(10);
 
 function getPreviousMonthLabel() {
@@ -145,6 +155,7 @@ export default function HomeClient() {
   const [ranking, setRanking] = useState([]);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [erhobenAm, setErhobenAm] = useState(null);
   const [monthlyTop, setMonthlyTop] = useState([]);
   const [monthlyTotalWeeks, setMonthlyTotalWeeks] = useState(0);
 
@@ -156,6 +167,7 @@ export default function HomeClient() {
     if (!selectedState) {
       setRanking([]);
       setLoadError(false);
+      setErhobenAm(null);
       return;
     }
 
@@ -168,7 +180,7 @@ export default function HomeClient() {
 
       const { data: currentData, error: currentError } = await supabase
         .from("preise")
-        .select("chain, price")
+        .select("chain, price, erhoben_am")
         .eq("region", selectedState)
         .eq("week", currentWeek.label);
 
@@ -177,6 +189,7 @@ export default function HomeClient() {
         if (!isCancelled) {
           setRanking([]);
           setLoadError(true);
+          setErhobenAm(null);
           setRankingLoading(false);
         }
         return;
@@ -184,6 +197,7 @@ export default function HomeClient() {
       if (!currentData || currentData.length === 0) {
         if (!isCancelled) {
           setRanking([]);
+          setErhobenAm(null);
           setRankingLoading(false);
         }
         return;
@@ -195,10 +209,12 @@ export default function HomeClient() {
         name: entry.chain,
         diffPercent: Math.round(((entry.price - bestPrice) / bestPrice) * 100),
       }));
+      const weekErhobenAm = formatErhobenDate(sortedCurrent[0]?.erhoben_am);
 
       if (weekIdx === 0) {
         if (!isCancelled) {
           setRanking(currentRanking.map((entry) => ({ ...entry, trend: null })));
+          setErhobenAm(weekErhobenAm);
           setRankingLoading(false);
         }
         return;
@@ -214,6 +230,7 @@ export default function HomeClient() {
       if (!prevData || prevData.length === 0) {
         if (!isCancelled) {
           setRanking(currentRanking.map((entry) => ({ ...entry, trend: null })));
+          setErhobenAm(weekErhobenAm);
           setRankingLoading(false);
         }
         return;
@@ -235,6 +252,7 @@ export default function HomeClient() {
 
       if (!isCancelled) {
         setRanking(finalRanking);
+        setErhobenAm(weekErhobenAm);
         setRankingLoading(false);
       }
     }
@@ -540,6 +558,11 @@ export default function HomeClient() {
                 <div className="text-xs mono-font" style={{ color: t.sub }}>
                   TOP {ranking.length} · {week.label} · {week.range}
                 </div>
+                {erhobenAm && (
+                  <div className="text-xs mono-font mt-0.5" style={{ color: t.sub }}>
+                    Erhoben am {erhobenAm}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-dashed mb-2" style={{ borderColor: t.border }} />
