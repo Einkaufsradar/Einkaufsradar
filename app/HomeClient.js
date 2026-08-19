@@ -619,10 +619,6 @@ export default function HomeClient() {
               </div>
             </div>
             <div className="torn-bottom" />
-
-            <p className="text-center text-xs mt-4" style={{ color: t.sub }}>
-              Aktualisiert · Sonntag 18:00 Uhr
-            </p>
           </>
         )}
       </div>
@@ -679,6 +675,13 @@ export default function HomeClient() {
                 <p className="text-xs" style={{ color: t.sub }}>
                   Bei aktivierter Push-Benachrichtigung meldet sich Einkaufsradar jeden Sonntag um 18 Uhr mit dem neuen Ranking für dein Bundesland. Ein-/ausschalten geht über den Button auf der Startseite.
                 </p>
+
+                <div className="border-t border-dashed pt-4 mt-1" style={{ borderColor: t.border }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: t.ink }}>Wöchentliche Aktualisierung</p>
+                  <p className="text-xs" style={{ color: t.sub }}>
+                    Jede neue Kalenderwoche steht automatisch ab Montag 00:00 Uhr zur Verfügung, sobald die entsprechenden Preise recherchiert und eingetragen wurden.
+                  </p>
+                </div>
 
                 <div className="border-t border-dashed pt-4 mt-1" style={{ borderColor: t.border }}>
                   <a href={feedbackMailto} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: t.pageBg, textDecoration: "none" }}>
